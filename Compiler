@@ -1,0 +1,138 @@
+package gui;
+import javax.swing.*;
+import java.awt.*;
+import java.applet.*;
+import java.awt.event.*;
+
+import mycompiler.cifa.CreatToken;
+import mycompiler.yufa.Recursion;
+
+public class compiler extends Applet implements ActionListener {
+    JFrame mJFrame;
+    JButton button1, button2;
+    TextArea text1;
+    JTextArea text2;
+    MyWindow window1, window2;
+    JDialog dialog1;
+
+    public  void init() {
+
+        mJFrame = new JFrame("My Compiler");
+        mJFrame.setLayout(new GridLayout(1, 2));
+
+        //代码输入部分
+        text1 = new TextArea("", 100, 450);
+        JPanel p1 = new JPanel();
+        p1.setLayout(new GridLayout(1, 1));
+        p1.add(text1);
+        JScrollPane scroll = new JScrollPane(text1);
+        p1.add(scroll);
+        mJFrame.add(p1);
+        //编译器说明部分
+        text2 = new JTextArea("                       使用说明\n\n", 100, 400);
+        text2.setLineWrap(true);
+        text2.append("   1.在左部文本框中输入SNL语言程序\n\n");
+        text2.append("   2.点击“词法分析”按钮，弹出消息框显示词法分析结果\n");
+        text2.append("(输出格式为:  行号：词法信息，语义信息)\n\n");
+        text2.append("   3.点击“语法分析”按钮，\n");
+        text2.append("a.若无语法错误则弹出消息框显示“语法分析成功”，\n");
+        text2.append("b.若有语法错误则弹出消息框显示出错的行数及错误原因\n\n");
+
+        JPanel p2 = new JPanel();
+        p2.setLayout(new GridLayout(1, 1));
+        p2.add(text2);
+        //选项
+        button1 = new JButton("词法分析");
+        button2 = new JButton("语法分析");
+        JPanel p3 = new JPanel();
+        p3.setLayout(new FlowLayout());
+        p3.add(button1);
+        p3.add(button2);
+        //右
+        JPanel p4 = new JPanel();
+        p4.setLayout(new GridLayout(1, 2));
+        p4.add(p3);
+        p4.add(p2);
+        mJFrame.add(p4);
+
+        //词法分析结果窗口
+        window1 = new MyWindow("词法分析结果");
+        //语法分析错误窗口
+        window2 = new MyWindow("语法错误信息");
+        // 语法分析正确窗口
+        dialog1 = new JDialog(mJFrame, "语法分析结果", true);
+        // 设置对话框的宽高
+        dialog1.setSize(250, 150);
+        // 设置对话框大小不可改变
+        dialog1.setResizable(false);
+        // 设置对话框相对显示的位置
+        dialog1.setLocationRelativeTo(mJFrame);
+        dialog1.setLayout(new GridLayout(2,1));
+        // 创建一个标签显示消息内容
+        JLabel messageLabel1 = new JLabel("                     语法分析成功！！");
+        JPanel temp=new JPanel();
+        // 创建一个按钮用于关闭对话框
+        JButton okBtn1 = new JButton("确定");
+        okBtn1.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                // 关闭对话框
+                dialog1.dispose();}});
+        dialog1.add(messageLabel1);
+        temp.add(okBtn1);
+        dialog1.add(temp);
+        button1.addActionListener(this);
+        button2.addActionListener(this);
+
+        mJFrame.setSize(800, 500);
+        mJFrame.setLocation(300, 200);
+        mJFrame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        mJFrame.setVisible(true);
+    }
+
+    public void actionPerformed(ActionEvent e) {
+        if (e.getSource() == button1) {
+            String s = text1.getText();
+            CreatToken ct = new CreatToken(s);
+            s = ct.tok;
+            s = s.trim();
+            window1.text.setText(s);
+            window1.setVisible(true);
+        } else if (e.getSource() == button2) {
+            String s = text1.getText();
+            CreatToken ct = new CreatToken(s);
+            s = ct.tok;
+            s = s.trim();
+            Recursion r = new Recursion(s);
+            if (r.ans==false) {
+                window2.text.setText(r.serror);
+                window2.setVisible(true);
+            } else {
+                dialog1.setVisible(true);
+            }
+        }
+    }
+}
+
+class MyWindow extends Frame
+{
+    TextArea text;
+    MyWindow(String s)
+    {
+        super(s);
+        setLayout(new GridLayout(1,1));
+        text=new TextArea("",50,100);
+        add(text);
+        setVisible(false);
+        pack();
+        addWindowListener(new WindowAdapter()
+        {
+            public void windowClosing(WindowEvent e)
+            {setVisible(false); /*System.exit(0);*/ }
+        });
+    }
+}
+
+
+
+
