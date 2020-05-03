@@ -1,0 +1,1038 @@
+package mycompiler.yufa;
+import java.util.*;
+import mycompiler.cifa.*;
+
+class TokenType       /****Token序列的定义*******/
+{
+    int lineshow;
+    String Lex;
+    String Sem;
+}
+
+/********************************************************************/
+/* 类  名 Recursion	                                            */
+/* 功  能 总程序的处理					            */
+/* 说  明 建立一个类，处理总程序                                    */
+/********************************************************************/
+public class Recursion {
+
+    TokenType token=new TokenType();//当前处理token
+    int  lineno=0;//当前处理行数
+
+    public String serror;//错误信息
+    boolean Error=false;//是否出现错误
+
+    StringTokenizer fenxi;//分割token
+
+    public boolean ans;
+
+    public Recursion(String s)
+    {
+        ans=Program(s);
+    }
+
+    /********************************************************************/
+    /********************************************************************/
+    /* 函数名 match							    */
+    /* 功  能 终极符匹配处理函数				            */
+    /* 说  明 函数参数expected给定期望单词符号与当前单词符号token相匹配 */
+    /*        如果不匹配,则报非期望单词语法错误			    */
+    /********************************************************************/
+    boolean match(String expected)
+    {
+        if (token.Lex.equals(expected))
+        {
+            ReadNextToken();
+            return true;
+        }
+
+        else
+        {
+            syntaxError("not match error ");
+            ReadNextToken();
+            return false;
+        }
+    }
+
+    /************************************************************/
+    /* 函数名 syntaxError                                       */
+    /* 功  能 语法错误处理函数		                    */
+    /* 说  明 将函数参数message指定的错误信息输出               */
+    /************************************************************/
+    void syntaxError(String s)     /*向错误信息.txt中写入字符串*/
+    {
+        serror=serror+"\n>>> ERROR :"+"Syntax error at "+String.valueOf(token.lineshow)+": "+s;
+        /* 设置错误追踪标志Error为TRUE,防止错误进一步传递 */
+        Error = true;
+    }
+
+    /********************************************************************/
+    /* 函数名 ReadNextToken                                             */
+    /* 功  能 从Token序列中取出一个Token				    */
+    /* 说  明 从文件中存的Token序列中依次取一个单词，作为当前单词       */
+    /********************************************************************/
+    void ReadNextToken()
+    {
+        //token.lineshow:token.Lex,token.Sem\n
+        if (fenxi.hasMoreTokens())
+        {
+            int i=1;
+            String stok=fenxi.nextToken();
+            StringTokenizer fenxi1=new StringTokenizer(stok,":,");
+            while (fenxi1.hasMoreTokens())
+            {
+                String fstok=fenxi1.nextToken();
+                if (i==1)
+                {
+                    token.lineshow=Integer.parseInt(fstok);
+                    lineno=token.lineshow;
+                }
+                if (i==2)
+                    token.Lex=fstok;
+                if (i==3)
+                    token.Sem=fstok;
+                i++;
+            }
+        }
+    }
+
+    /********************************************************************/
+    /********************************************************************/
+    /********************************************************************/
+    /* 函数名 Program					            */
+    /* 功  能 总程序的处理函数					    */
+    /* 产生式 < Program > ::= ProgramHead DeclarePart ProgramBody .     */
+    /********************************************************************/
+    boolean Program(String ss)
+    {
+        fenxi=new StringTokenizer(ss,"\n");
+        ReadNextToken();
+        boolean ans=true;
+        if(ProgramHead()==false){
+            syntaxError("a program head is expected!");
+            ans=false;
+        }
+        if(DeclarePart()==false) {ans=false;}
+        if (ProgramBody()==false){
+            syntaxError("a program body is expected!");
+            ans=false;
+        }
+        if(match("DOT")==false);{ans=false;}
+        if (!(token.Lex.equals("ENDFILE"))){
+            ans=false;
+            syntaxError("Code ends before file\n");
+        }
+        if (Error==true&&ans==false)
+            return false;
+        else
+            return true;
+    }
+
+    /**************************函数头部分********************************/
+    /********************************************************************/
+    /********************************************************************/
+    /* 函数名 ProgramHead						    */
+    /* 功  能 程序头的处理函数					    */
+    /* 产生式 < ProgramHead > ::= PROGRAM  ProgramName                  */
+    /********************************************************************/
+    boolean ProgramHead()
+    {
+        return  match("PROGRAM")&&match("ID");
+    }
+
+    /**************************声明部分**********************************/
+    /********************************************************************/
+    /********************************************************************/
+    /* 函数名 DeclarePart						    */
+    /* 功  能 声明部分的处理					    */
+    /* 产生式 < DeclarePart > ::= TypeDec  VarDec  ProcDec              */
+    /********************************************************************/
+    boolean DeclarePart()
+    {
+        /*类型*/
+        boolean tp1 = TypeDec();
+        /*变量*/
+        boolean tp2 = VarDec();
+        /*函数*/
+        boolean procP = ProcDec();
+        return tp1&&tp2&&procP;
+    }
+
+    /**************************类型声明部分******************************/
+    /********************************************************************/
+    /* 函数名 TypeDec					            */
+    /* 功  能 类型声明部分的处理    				    */
+    /* 产生式 < TypeDec > ::= ε | TypeDeclaration */
+    /********************************************************************/
+    boolean TypeDec()
+    {
+        if (token.Lex.equals("TYPE"))
+            return TypeDeclaration();
+        else if ((token.Lex.equals("VAR"))||(token.Lex.equals("PROCEDURE"))
+                ||(token.Lex.equals("BEGIN"))) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 TypeDeclaration					    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < TypeDeclaration > ::= TYPE  TypeDecList                 */
+    /********************************************************************/
+    boolean TypeDeclaration()
+    {
+        if(match("TYPE"))
+        {
+            if (TypeDecList()==false)
+            {
+                syntaxError("a type declaration is expected!");
+                return false;
+            }
+            else
+                return true;
+        }
+        else
+            return false;
+    }
+
+    /********************************************************************/
+    /* 函数名 TypeDecList		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < TypeDecList > ::= TypeId = TypeName ; TypeDecMore       */
+    /********************************************************************/
+    boolean TypeDecList()
+    {
+        return TypeId()&&match("EQ")&&TypeName()&& match("SEMI")&&TypeDecMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 TypeDecMore		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < TypeDecMore > ::=    ε | TypeDecList                   */
+    /* 说  明 函数根据文法产生式,调用相应的递归处理函数,生成语法树节点  */
+    /********************************************************************/
+    boolean TypeDecMore()
+    {
+        if (token.Lex.equals("ID"))
+            return TypeDecList();
+        else if ((token.Lex.equals("VAR"))||(token.Lex.equals("PROCEDURE"))||(token.Lex.equals("BEGIN"))) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 TypeId		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < TypeId > ::= id                                         */
+    /********************************************************************/
+    boolean TypeId()
+    {
+        return match("ID");
+    }
+
+
+    /********************************************************************/
+    /* 函数名 TypeName		 				    */
+    /* 功  能 类型声明部分的处理				            */
+    /* 产生式 < TypeName > ::= BaseType | StructureType | id            */
+    /********************************************************************/
+    boolean TypeName()
+    {
+        if ((token.Lex.equals("INTEGER"))||(token.Lex.equals("CHAR")))
+            return BaseType();
+        else if ((token.Lex.equals("ARRAY"))||(token.Lex.equals("RECORD")))
+            return StructureType();
+        else if (token.Lex.equals("ID"))
+        {
+            return match("ID");
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 BaseType		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < BaseType > ::=  INTEGER | CHAR                          */
+    /********************************************************************/
+    boolean BaseType()
+    {
+        if (token.Lex.equals("INTEGER")) {
+            return match("INTEGER");
+        }
+        else if (token.Lex.equals("CHAR"))
+        {
+            return match("CHAR");
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 StructureType		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < StructureType > ::=  ArrayType | RecType                */
+    /********************************************************************/
+    boolean StructureType()
+    {
+        if (token.Lex.equals("ARRAY"))
+        {
+            return ArrayType();
+        }
+        else if (token.Lex.equals("RECORD"))
+        {
+            return RecType();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 ArrayType                                                 */
+    /* 功  能 类型声明部分的处理函数			            */
+    /* 产生式 < ArrayType > ::=  ARRAY [low..top] OF BaseType           */
+    /********************************************************************/
+    boolean ArrayType()
+    {
+        return  match("ARRAY")
+                &&match("LMIDPAREN")
+                &&match("INTC")
+                &&match("UNDERANGE")
+                &&match("INTC")
+                &&match("RMIDPAREN")
+                &&match("OF")
+                &&BaseType();
+    }
+
+    /********************************************************************/
+    /* 函数名 RecType		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < RecType > ::=  RECORD FieldDecList END                  */
+    /********************************************************************/
+    boolean RecType()
+    {
+        boolean ans=true;
+        if(!match("RECORD")){ans=false;}
+        if (!FieldDecList())
+        {
+            syntaxError("a record body is requested!");
+            ans=false;
+        }
+        if(!match("END")){ans=false;}
+        return ans;
+    }
+    /********************************************************************/
+    /* 函数名 FieldDecList		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < FieldDecList > ::=   BaseType IdList ; FieldDecMore     */
+    /*                             | ArrayType IdList; FieldDecMore     */
+    /********************************************************************/
+    boolean  FieldDecList()
+    {
+
+        if ((token.Lex.equals("INTEGER"))||(token.Lex.equals("CHAR")))
+        {
+            return BaseType()&& IdList()&&match("SEMI")&&FieldDecMore();
+        }
+        else if (token.Lex.equals("ARRAY"))
+        {
+            return ArrayType() &&IdList() &&match("SEMI") &&FieldDecMore();
+        }
+        else
+        {
+            ReadNextToken();
+            syntaxError("type name is expected");
+            return false;
+        }
+    }
+    /********************************************************************/
+    /* 函数名 FieldDecMore		 				    */
+    /* 功  能 类型声明部分的处理函数			            */
+    /* 产生式 < FieldDecMore > ::=  ε | FieldDecList                   */
+    /********************************************************************/
+    boolean FieldDecMore()
+    {
+
+        if (token.Lex.equals("INTEGER")||token.Lex.equals("CHAR")||token.Lex.equals("ARRAY"))
+            return FieldDecList();
+        else if (token.Lex.equals("END")) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 IdList		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < IdList > ::=  id  IdMore                                */
+    /********************************************************************/
+    boolean IdList()
+    {
+
+        return match("ID") &&IdMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 IdMore		 				    */
+    /* 功  能 类型声明部分的处理函数				    */
+    /* 产生式 < IdMore > ::=  ε |  , IdList                            */
+    /********************************************************************/
+    boolean IdMore()
+    {
+        if (token.Lex.equals("COMMA"))
+        {
+            return match("COMMA")&&IdList();
+        }
+        else if (token.Lex.equals("SEMI")) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /**************************变量声明部分******************************/
+    /********************************************************************/
+    /* 函数名 VarDec		 				    */
+    /* 功  能 变量声明部分的处理				            */
+    /* 产生式 < VarDec > ::=  ε |  VarDeclaration                      */
+    /********************************************************************/
+    boolean VarDec()
+    {
+        if (token.Lex.equals("VAR"))
+            return VarDeclaration();
+        else if ((token.Lex.equals("PROCEDURE"))||(token.Lex.equals("BEGIN"))){}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 VarDeclaration		 			    */
+    /* 功  能 变量声明部分的处理函数				    */
+    /* 产生式 < VarDeclaration > ::=  VAR  VarDecList                   */
+    /********************************************************************/
+    boolean VarDeclaration()
+    {
+        boolean ans=true;
+        if(!match("VAR")){ans=false;}
+        if (!VarDecList())
+        {
+            syntaxError("a var declaration is expected!");
+            ans=false;
+        }
+        return ans;
+    }
+
+    /********************************************************************/
+    /* 函数名 VarDecList		 				    */
+    /* 功  能 变量声明部分的处理函数				    */
+    /* 产生式 < VarDecList > ::=  TypeName VarIdList; VarDecMore        */
+    /********************************************************************/
+    boolean VarDecList()
+    {
+        return TypeName()&&VarIdList()&&match("SEMI")&&VarDecMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 VarDecMore		 				    */
+    /* 功  能 变量声明部分的处理函数				    */
+    /* 产生式 < VarDecMore > ::=  ε |  VarDecList                      */
+    /********************************************************************/
+    boolean VarDecMore()
+    {
+        if ((token.Lex.equals("INTEGER"))||(token.Lex.equals("CHAR"))||(token.Lex.equals("ARRAY"))||(token.Lex.equals("RECORD")||(token.Lex.equals("ID"))))
+            return VarDecList();
+        else if ((token.Lex.equals("PROCEDURE"))||(token.Lex.equals("BEGIN"))) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 VarIdList		 				    */
+    /* 功  能 变量声明部分的处理函数			            */
+    /* 产生式 < VarIdList > ::=  id  VarIdMore                          */
+    /********************************************************************/
+    boolean VarIdList()
+    {
+        boolean ans=true;
+        if (!match("ID"))
+        {
+            ans=false;
+            syntaxError("a varid is expected here!");
+            ReadNextToken();
+        }
+        return ans&&VarIdMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 VarIdMore		 				    */
+    /* 功  能 变量声明部分的处理函数				    */
+    /* 产生式 < VarIdMore > ::=  ε |  , VarIdList                      */
+    /********************************************************************/
+    boolean VarIdMore()
+    {
+        if (token.Lex.equals("COMMA"))
+        {
+            return match("COMMA")&&VarIdList();
+        }
+        else if (token.Lex.equals("SEMI"))  {}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /****************************过程声明部分****************************/
+    /********************************************************************/
+    /* 函数名 ProcDec		 		                    */
+    /* 功  能 函数声明部分的处理					    */
+    /* 产生式 < ProcDec > ::=  ε |  ProcDeclaration                    */
+    /********************************************************************/
+    boolean ProcDec()
+    {
+        if (token.Lex.equals("PROCEDURE"))
+            return ProcDeclaration();
+        else if (token.Lex.equals("BEGIN")) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 ProcDeclaration		 			    */
+    /* 功  能 函数声明部分的处理函数				    */
+    /* 产生式 < ProcDeclaration > ::=  PROCEDURE ProcName(ParamList);   */
+    /*                                 ProcDecPart                      */
+    /*                                 ProcBody                         */
+    /*                                 ProcDecMore                      *
+    /********************************************************************/
+    boolean ProcDeclaration()
+    {
+        return
+                match("PROCEDURE")&&match("ID")
+                        && match("LPAREN")
+                        &&ParamList()
+                        && match("RPAREN")
+                        && match("SEMI")
+                        &&ProcDecPart()
+                        &&ProcBody()
+                        &&ProcDecMore();
+    }
+    /********************************************************************/
+    /* 函数名 ProcDecMore    				            */
+    /* 功  能 更多函数声明中处理函数        	        	    */
+    /* 产生式 < ProcDecMore > ::=  ε |  ProcDeclaration                */
+    /********************************************************************/
+    boolean ProcDecMore()
+    {
+        if (token.Lex.equals("PROCEDURE"))
+            return  ProcDeclaration();
+        else if (token.Lex.equals("BEGIN"))  {}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 ParamList		 				    */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < ParamList > ::=  ε |  ParamDecList                     */
+    /********************************************************************/
+    boolean ParamList()
+    {
+        if ((token.Lex.equals("INTEGER"))
+                ||(token.Lex.equals("CHAR"))
+                ||(token.Lex.equals("ARRAY"))
+                ||(token.Lex.equals("RECORD"))
+                ||(token.Lex.equals("ID"))
+                ||(token.Lex.equals("VAR")))
+        {
+            boolean b= ParamDecList();
+            if(!b)
+                syntaxError("paramter error!");
+            return b;
+        }
+        else if (token.Lex.equals("RPAREN")) {}
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 ParamDecList		 			    	    */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < ParamDecList > ::=  Param  ParamMore                    */
+    /********************************************************************/
+    boolean ParamDecList()
+    {
+        return Param()&&ParamMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 ParamMore		 			    	    */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < ParamMore > ::=  ε | ; ParamDecList                    */
+    /********************************************************************/
+    boolean ParamMore()
+    {
+        boolean ans=true;
+        if (token.Lex.equals("SEMI"))
+        {
+            if(!match("SEMI"))
+            {
+                ans=false;
+            }
+            if (!ParamDecList())
+            {
+                syntaxError("a param declaration is request!");
+                ans=false;
+            }
+            return ans;
+        }
+        else if (token.Lex.equals("RPAREN")){}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 Param		 			    	            */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < Param > ::=  TypeName FormList | VAR TypeName FormList  */
+    /********************************************************************/
+    boolean Param()
+    {
+        if ((token.Lex.equals("INTEGER"))
+                ||(token.Lex.equals("CHAR"))
+                ||(token.Lex.equals("ARRAY"))
+                ||(token.Lex.equals("RECORD"))
+                || (token.Lex.equals("ID")))
+        {
+            return TypeName()&&FormList();
+        }
+        else if (token.Lex.equals("VAR"))
+        {
+            return match("VAR")&&TypeName()&&FormList();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 FormList		 			    	    */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < FormList > ::=  id  FidMore                             */
+    /********************************************************************/
+    boolean FormList()
+    {
+        return match("ID")&&FidMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 FidMore		 			    	    */
+    /* 功  能 函数声明中参数声明部分的处理函数	        	    */
+    /* 产生式 < FidMore > ::=   ε |  , FormList                        */
+    /********************************************************************/
+    boolean FidMore()
+    {
+        if (token.Lex.equals("COMMA"))
+        {
+            return match("COMMA")&&FormList();
+        }
+        else if ((token.Lex.equals("SEMI"))||(token.Lex.equals("RPAREN"))){}
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 ProcDecPart		 			  	    */
+    /* 功  能 函数中的声明部分的处理函数	             	            */
+    /* 产生式 < ProcDecPart > ::=  DeclarePart                          */
+    /********************************************************************/
+    boolean ProcDecPart()
+    {
+        return DeclarePart();
+    }
+
+    /********************************************************************/
+    /* 函数名 ProcBody		 			  	    */
+    /* 功  能 函数体部分的处理函数	                    	            */
+    /* 产生式 < ProcBody > ::=  ProgramBody                             */
+    /********************************************************************/
+    boolean ProcBody()
+    {
+        if (!ProgramBody())
+        {
+            syntaxError("a program body is requested!");
+            return false;
+        }
+        else
+            return true;
+    }
+
+    /****************************函数体部分******************************/
+    /********************************************************************/
+    /********************************************************************/
+    /* 函数名 ProgramBody		 			  	    */
+    /* 功  能 程序体部分的处理	                    	            */
+    /* 产生式 < ProgramBody > ::=  BEGIN  StmList   END                 */
+    /********************************************************************/
+    boolean ProgramBody()
+    {
+        return match("BEGIN")&&StmList()&&match("END");
+    }
+
+    /********************************************************************/
+    /* 函数名 StmList		 			  	    */
+    /* 功  能 语句部分的处理函数	                    	            */
+    /* 产生式 < StmList > ::=  Stm    StmMore                           */
+    /********************************************************************/
+    boolean StmList()
+    {
+        return Stm()&&StmMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 StmMore		 			  	    */
+    /* 功  能 语句部分的处理函数	                    	            */
+    /* 产生式 < StmMore > ::=   ε |  ; StmList                         */
+    /********************************************************************/
+    boolean StmMore()
+    {
+        if ((token.Lex.equals("ELSE"))||(token.Lex.equals("FI"))||(token.Lex.equals("END"))||(token.Lex.equals("ENDWH"))) {}
+        else if (token.Lex.equals("SEMI"))
+        {
+            return match("SEMI")&&StmList();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+    /********************************************************************/
+    /* 函数名 Stm   		 			  	    */
+    /* 功  能 语句部分的处理函数	                    	            */
+    /* 产生式 < Stm > ::=   ConditionalStm   {IF}                       */
+    /*                    | LoopStm          {WHILE}                    */
+    /*                    | InputStm         {READ}                     */
+    /*                    | OutputStm        {WRITE}                    */
+    /*                    | ReturnStm        {RETURN}                   */
+    /*                    | id  AssCall      {id}                       */
+    /********************************************************************/
+    boolean Stm()
+    {
+        if (token.Lex.equals("IF"))
+            return ConditionalStm();
+        else if (token.Lex.equals("WHILE"))
+            return LoopStm();
+        else if (token.Lex.equals("READ"))
+            return InputStm();
+        else if (token.Lex.equals("WRITE"))
+            return OutputStm();
+        else if (token.Lex.equals("RETURN"))
+            return ReturnStm();
+        else if (token.Lex.equals("ID"))
+        {
+            return match("ID")&&AssCall();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 AssCall		 			  	    */
+    /* 功  能 语句部分的处理函数	                    	            */
+    /* 产生式 < AssCall > ::=   AssignmentRest   {:=,LMIDPAREN,DOT}     */
+    /*                        | CallStmRest      {(}                    */
+    /********************************************************************/
+    boolean AssCall()
+    {
+        if ((token.Lex.equals("ASSIGN"))||(token.Lex.equals("LMIDPAREN"))||(token.Lex.equals("DOT")))
+            return AssignmentRest();
+        else if (token.Lex.equals("LPAREN"))
+            return CallStmRest();
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 AssignmentRest		 			    */
+    /* 功  能 赋值语句部分的处理函数	                    	    */
+    /* 产生式 < AssignmentRest > ::=  VariMore : = Exp                  */
+    /********************************************************************/
+    boolean AssignmentRest()
+    {
+        return VariMore()&& match("ASSIGN")&&Exp();
+    }
+
+    /********************************************************************/
+    /* 函数名 ConditionalStm		 			    */
+    /* 功  能 条件语句部分的处理函数	                    	    */
+    /* 产生式 <ConditionalStm>::=IF RelExp THEN StmList ELSE StmList FI */
+    /********************************************************************/
+    boolean ConditionalStm()
+    {
+
+        boolean ans=match("IF")&&Exp()&&match("THEN")&&StmList();
+        if(token.Lex.equals("ELSE"))
+        {
+            if(match("ELSE"))
+                ans=ans&&StmList();
+            else
+                ans=false;
+        }
+        ans=ans&&match("FI");
+        return ans;
+    }
+
+    /********************************************************************/
+    /* 函数名 LoopStm          		 			    */
+    /* 功  能 循环语句部分的处理函数	                    	    */
+    /* 产生式 < LoopStm > ::=   WHILE RelExp DO StmList ENDWH           */
+    /********************************************************************/
+    boolean LoopStm()
+    {
+        return match("WHILE")&& Exp()&&match("DO")&&StmList()&&match("ENDWH");
+    }
+
+    /********************************************************************/
+    /* 函数名 InputStm          		     	                    */
+    /* 功  能 输入语句部分的处理函数	                    	    */
+    /* 产生式 < InputStm > ::=  READ(id)                                */
+    /********************************************************************/
+    boolean InputStm()
+    {
+        boolean ans=true;
+        if(!match("READ")){ans=false;}
+        if(!match("LPAREN")){ans=false;}
+        if (token.Lex.equals("ID"))
+        {
+            if(!match("ID"))
+                ans=false;
+        }
+        if(!match("RPAREN")){ans=false;}
+        return ans;
+    }
+
+    /********************************************************************/
+    /* 函数名 OutputStm          		     	                    */
+    /* 功  能 输出语句部分的处理函数	                    	    */
+    /* 产生式 < OutputStm > ::=   WRITE(Exp)                            */
+    /********************************************************************/
+    boolean OutputStm()
+    {
+        return match("WRITE")&&match("LPAREN")&&Exp()&&match("RPAREN");
+    }
+
+    /********************************************************************/
+    /* 函数名 ReturnStm          		     	                    */
+    /* 功  能 返回语句部分的处理函数	                    	    */
+    /* 产生式 < ReturnStm > ::=   RETURN(Exp)                           */
+    /********************************************************************/
+    boolean ReturnStm()
+    {
+        return match("RETURN");
+    }
+
+    /********************************************************************/
+    /* 函数名 CallStmRest          		     	                    */
+    /* 功  能 函数调用语句部分的处理函数	                  	    */
+    /* 产生式 < CallStmRest > ::=  (ActParamList)                       */
+    /********************************************************************/
+    boolean CallStmRest()
+    {
+
+        return match("LPAREN")&&ActParamList()&&match("RPAREN");
+    }
+
+/********************************************************************/
+    /* 函数名 ActParamList          		   	            */
+    /* 功  能 函数调用实参部分的处理函数	                	    */
+    /* 产生式 < ActParamList > ::=     ε |  Exp ActParamMore           */
+    /********************************************************************/
+    boolean ActParamList()
+    {
+        if (token.Lex.equals("RPAREN"))  {}
+        else if ((token.Lex.equals("ID"))||(token.Lex.equals("INTC")))
+        {
+            return  Exp()&&ActParamMore();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /********************************************************************/
+    /* 函数名 ActParamMore          		   	            */
+    /* 功  能 函数调用实参部分的处理函数	                	    */
+    /* 产生式 < ActParamMore > ::=     ε |  , ActParamList             */
+    /********************************************************************/
+    boolean ActParamMore()
+    {
+        if (token.Lex.equals("RPAREN"))  {}
+        else if (token.Lex.equals("COMMA"))
+        {
+            return match("COMMA")&&ActParamList();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+    /*************************表达式部分********************************/
+    /*******************************************************************/
+    /* 函数名 Exp							   */
+    /* 功  能 表达式处理函数					   */
+    /* 产生式 Exp ::= simple_exp | 关系运算符  simple_exp              */
+    /* 说  明 函数根据文法产生式,调用相应的递归处理函数,生成语法树节点 */
+    /*******************************************************************/
+    boolean Exp()
+    {
+        boolean ans=simple_exp();
+        /* 当前单词token为逻辑运算单词LT或者EQ */
+        if ((token.Lex.equals("LT"))||(token.Lex.equals("EQ")))
+        {
+            return ans&&match(token.Lex)&&simple_exp();
+        }
+        return ans;
+    }
+
+    /*******************************************************************/
+    /* 函数名 simple_exp						   */
+    /* 功  能 表达式处理						   */
+    /* 产生式 simple_exp ::=   term  |  加法运算符  term               */
+    /*******************************************************************/
+    boolean simple_exp()
+    {
+        boolean ans= term();
+        boolean b=true;
+        /* 当前单词token为加法运算符单词PLUS或MINUS */
+        while ((token.Lex.equals("PLUS"))||(token.Lex.equals("MINUS")))
+        {
+            b=match(token.Lex)&&term();
+        }
+        return b&&ans;
+    }
+
+    /********************************************************************/
+    /* 函数名 term						            */
+    /* 功  能 项处理函数						    */
+    /* 产生式 < 项 > ::=  factor | 乘法运算符  factor		    */
+    /********************************************************************/
+    boolean term()
+    {
+        boolean ans=factor();
+        /* 当前单词token为乘法运算符单词TIMES或OVER */
+        while ((token.Lex.equals("TIMES"))||(token.Lex.equals("OVER")))
+        {
+
+            return match(token.Lex)&&factor();
+        }
+        return ans;
+    }
+
+    /*********************************************************************/
+    /* 函数名 factor						     */
+    /* 功  能 因子处理函数						     */
+    /* 产生式 factor ::= INTC | Variable | ( Exp )                       */
+    /*********************************************************************/
+    boolean factor()
+    {
+        if (token.Lex.equals("INTC"))
+        {
+            return match("INTC");
+        }
+        else if (token.Lex.equals("ID"))
+            return Variable();
+        else if (token.Lex.equals("LPAREN"))
+        {
+            return match("LPAREN")&&Exp()&&match("RPAREN");
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+
+
+    /********************************************************************/
+    /* 函数名 Variable						    */
+    /* 功  能 变量处理函数						    */
+    /* 产生式 Variable   ::=   id VariMore                   	    */
+    /********************************************************************/
+    boolean Variable()
+    {
+        return match("ID")&&VariMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 VariMore						    */
+    /* 功  能 变量处理						    */
+    /* 产生式 VariMore   ::=  ε                             	    */
+    /*                       | [Exp]            {[}                     */
+    /*                       | . FieldVar       {DOT}                   */
+    /********************************************************************/
+    boolean VariMore()
+    {
+        if ((token.Lex.equals("EQ"))
+                ||(token.Lex.equals("LT"))
+                ||(token.Lex.equals("PLUS"))
+                ||(token.Lex.equals("MINUS"))
+                ||(token.Lex.equals("RPAREN"))
+                ||(token.Lex.equals("RMIDPAREN"))
+                ||(token.Lex.equals("SEMI"))
+                ||(token.Lex.equals("COMMA"))
+                || (token.Lex.equals("THEN"))
+                ||(token.Lex.equals("ELSE"))
+                ||(token.Lex.equals("FI"))
+                ||(token.Lex.equals("DO"))
+                ||(token.Lex.equals("ENDWH"))
+                ||(token.Lex.equals("END"))
+                ||(token.Lex.equals("ASSIGN"))
+                ||(token.Lex.equals("TIMES"))
+                ||(token.Lex.equals("OVER"))){}
+        else if (token.Lex.equals("LMIDPAREN"))
+        {
+            return match("LMIDPAREN")&&Exp()&&match("RMIDPAREN");
+        }
+        else if (token.Lex.equals("DOT"))
+        {
+            return match("DOT")&&FieldVar();
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+/********************************************************************/
+    /* 函数名 FieldVar						    */
+    /* 功  能 变量处理函数				                    */
+    /* 产生式 FieldVar   ::=  id  FieldVarMore                          */
+    /********************************************************************/
+    boolean FieldVar()
+    {
+        return match("ID")&&FieldVarMore();
+    }
+
+    /********************************************************************/
+    /* 函数名 FieldVarMore  			                    */
+    /* 功  能 变量处理函数                                              */
+    /* 产生式 FieldVarMore   ::=  ε| [Exp]            {[}              */
+    /********************************************************************/
+    boolean FieldVarMore()
+    {
+        if ((token.Lex.equals("ASSIGN"))
+                ||(token.Lex.equals("TIMES"))
+                ||(token.Lex.equals("EQ"))||(token.Lex.equals("LT"))
+                ||(token.Lex.equals("PLUS"))||(token.Lex.equals("MINUS"))
+                || (token.Lex.equals("OVER"))||(token.Lex.equals("RPAREN"))
+                || (token.Lex.equals("SEMI"))||(token.Lex.equals("COMMA"))
+                ||(token.Lex.equals("THEN"))||(token.Lex.equals("ELSE"))
+                ||(token.Lex.equals("FI"))||(token.Lex.equals("DO"))
+                || (token.Lex.equals("ENDWH"))||(token.Lex.equals("END")))
+        {}
+        else if (token.Lex.equals("LMIDPAREN"))
+        {
+            return match("LMIDPAREN")&&Exp()&&match("RMIDPAREN");
+        }
+        else
+            ReadNextToken();
+        return true;
+    }
+}
